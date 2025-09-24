@@ -8,16 +8,13 @@ from fastapi.security import (
 )
 import bcrypt
 
-from v1.settings import settings
+from app.settings import settings
 
 SECRET_KEY, ALGORITHM = settings.security.secret_key, settings.security.algorithm
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="token",
-    scopes={
-        "users:me": "Read information about the current user.",
-        "users:read": "Read users.",
-    },
+    scopes=settings.scopes,
 )
 
 

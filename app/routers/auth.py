@@ -1,38 +1,34 @@
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response, Depends, status
-from fastapi.params import Security
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from v1.app import UserCRUD, auth, schemas
-from v1.app.models import UserType, User
-from v1.dependencies import get_current_active_user
-from v1.settings import settings
+from app import UserCRUD, auth, schemas
+from app.dependencies import get_current_active_user
+from app.models import User, UserType
+from app.settings import settings
 
-__tags__ = ["auth"]
-__prefix__ = ""
 user_type_to_scopes = {
-    UserType.DEFAULT: {
-        "users:me",
-    },
-    UserType.ADMIN: {
-        "users:me",
-        "users:read",
-    },
+    UserType.DEFAULT: {"users:me", "users:read"},
+    UserType.ADMIN: {"users:me", "users:read", "users:edit"},
 }
 
-router = APIRouter()
+router = APIRouter(tags=["auth"])
 
 
 @router.post("/token")
 async def login_for_token(
-    *, form_data: Annotated[OAuth2PasswordRequestForm, Depends()], response: Response
+    *, form_data: Annotated[schemas.CustomOAuth2Form, Depends()], response: Response
 ) -> schemas.TokenSchema:
-    if not (user := await UserCRUD.get_by_email(form_data.username)):
+    if not (user := await UserCRUD.get_by(email=form_data.username)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The user with this email could not be found",
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user."
         )
 
     if not auth.verify_password(form_data.password, user.password_hash):
@@ -42,9 +38,7 @@ async def login_for_token(
 
     scopes = form_data.scopes if form_data.scopes else ["users:me"]
     allowed_scopes = user_type_to_scopes[user.type]
-    print(allowed_scopes)
-    print(user.type)
-    print(UserType.ADMIN)
+
     if not set(form_data.scopes).issubset(allowed_scopes):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -52,7 +46,7 @@ async def login_for_token(
                 "message": "Not enough permissions",
                 "allowed_scopes": " ".join(allowed_scopes),
             },
-            headers={"WWW-Authenticate": f"bearer"},
+            headers={"WWW-Authenticate": "bearer"},
         )
 
     access_token_expires = timedelta(
@@ -73,7 +67,7 @@ async def login_for_token(
 
 @router.get("/logout")
 async def logout(
-    response: Response, _: Annotated[User, Security(get_current_active_user)]
+    response: Response, _: Annotated[User, Depends(get_current_active_user)]
 ):
     response.delete_cookie(key="Authorization")
 

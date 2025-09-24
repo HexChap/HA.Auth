@@ -1,0 +1,50 @@
+services:
+  auth_ms:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      JWT_ACCESS_SECRET_KEY: ${JWT_ACCESS_SECRET_KEY}
+      JWT_REFRESH_SECRET_KEY: ${JWT_REFRESH_SECRET_KEY}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      DB_URL: "asyncpg://${DB_USER}:${DB_PASSWORD}@auth_db:5432/${DB_NAME}"
+      IS_PRODUCTION: ${IS_PRODUCTION}
+    networks:
+      - backend
+    depends_on:
+      - auth_db
+
+  auth_db:
+    image: postgres:14-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: always
+    ports:
+      - "8888:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PG_ADMIN_LOGIN}
+      PGADMIN_DEFAULT_PASSWORD: ${PG_ADMIN_PASSWORD}
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - backend
+
+volumes:
+  pgdata:
+  pgadmin-data:
+
+networks:
+  backend:

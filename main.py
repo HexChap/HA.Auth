@@ -1,68 +1,43 @@
-import importlib
-import os
+from pathlib import Path
 
 import uvicorn as uvicorn
 from fastapi import FastAPI
-from tortoise.contrib.fastapi import register_tortoise
+from fastapi.logger import logger
+from ms_core import setup_app
 
-from v1.settings import settings
-
+from app.models import User
+from app.settings import settings
 
 application = FastAPI(
     title=settings.api.title,
     version=f"{settings.api.version}.{settings.api.build_version}",
-    root_path="/v1",
 )
 
-TORTOISE_CONFIG = {
-    "connections": {"default": os.environ["DATABASE_URL"]},
-    "apps": {
-        "models": {
-            "models": ["v1.app.models", "aerich.models"],
-            "default_connection": "default",
-        },
-    },
-}
+TORTOISE_CONFIG = setup_app(
+    application,
+    settings.db_url,
+    Path("app") / "routers",
+    ["app.models", "aerich.models"],
+)
 
 
-def configure_tortoise(app: FastAPI):
-    """
-    Generates a list of paths to the models, includes aerich, then registers Tortoise
+@application.on_event("startup")  # if using RegisterTortoise
+async def seed():
+    admin = {
+        "username": "admin",
+        "email": "admin@example.com",
+        "password_hash": "$2b$12$070KuA1BMhdKmnWwncQTEejGJHvTl2ZVGez5jLXiw4ZzpVb4kBURa",
+        "type": "admin",
+        "is_active": True,
+    }
 
-    :param app: Instance of FastAPI class
-    :return:
-    """
-    register_tortoise(
-        app,
-        config=TORTOISE_CONFIG,
-        generate_schemas=True,
-        add_exception_handlers=True,
-    )
+    if settings.is_prod:
+        return
 
+    _, created = await User.get_or_create(admin, email=admin["email"])
 
-def include_routers(app: FastAPI):
-    """
-    Routers must contain the variables **__tags__** and **__prefix__** \n
-    If router's name starts with "_" it won't be included
-
-    :param app: Instance of FastAPI class
-    :return: None
-    """
-    for module_name in os.listdir(settings.api.version_path / "routers"):
-        if module_name.startswith("_") or not module_name.endswith(".py"):
-            continue
-
-        module = importlib.import_module(
-            f"v1.routers.{module_name.removesuffix('.py')}"
-        )
-
-        app.include_router(
-            module.router, tags=module.__tags__, prefix=module.__prefix__
-        )
-
-
-configure_tortoise(application)
-include_routers(application)
+    if created:
+        logger.info("Seeded non-prod admin.")
 
 
 # if __name__ == "__main__":

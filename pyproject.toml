@@ -8,9 +8,10 @@ dependencies = [
     "aerich==0.7.2",
     "asyncpg==0.30.0",
     "bcrypt==4.2.1",
-    "fastapi==0.112.4",
+    "fastapi[standard]>=0.112.4",
     "ms-core",
     "passlib==1.7.4",
+    "polyfactory[pydantic]>=2.22.2",
     "pydantic-settings==2.6.1",
     "pydantic[dotenv,email]==2.10.2",
     "pyjwt==2.10.1",
@@ -28,4 +29,4 @@ src_folder = "./."
 reportInvalidTypeForm = "none"
 
 [tool.uv.sources]
-ms-core = { url = "https://github.com/HexChap/MSCore/archive/master.zip" }
+ms-core = { url = "https://github.com/HexChap/MSCore/archive/refs/heads/master.zip" }
